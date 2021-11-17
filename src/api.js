@@ -38,7 +38,7 @@ api.post('/exec/:project/:job', (req, res) => {
             if(err !== null) {
                 return console.error(`[${projectName}:${jobName}] error:\n${err.toString()}`)
             } else {
-                return console.error(`[${projectName}:${jobName}] done`)
+                return console.log(`[${projectName}:${jobName}] done`)
             }
         })
 
