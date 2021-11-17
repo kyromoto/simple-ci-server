@@ -1,16 +1,18 @@
 # simple-ci-server
 
-## .env
+#### .env
 
-```SERVER_PORT=3000
+```
+SERVER_PORT=3000
 CONFIG_PATH=configs
 ```
 
-## project configuration
+#### project configuration
 
 Use a seperate file for each project in your config folder. The filename reflects the projectname (case sensitive).
 
-```---
+```
+---
 # sample.yaml
   jobs:
     build:
