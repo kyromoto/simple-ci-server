@@ -10,6 +10,7 @@ This is my own CI server to run on my web server. It was written to trigger buil
 
 ```
 # .env
+SERVER_HOST=0.0.0.0
 SERVER_PORT=3000
 CONFIG_PATH=configs
 ```
