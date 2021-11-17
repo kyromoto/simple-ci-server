@@ -2,14 +2,17 @@ const fs = require('fs/promises');
 const path = require('path');
 const childProcess = require('child_process')
 const yaml = require('js-yaml');
+const logger = require('./logger')
 
 const CONFIG_PATH = path.normalize(process.env.CONFIG_PATH || 'configs')
 
-const exec = function (config, projectName, jobName, callback) {
+const processorLogger = logger.getServiceLogger('processor')
+
+const exec = function (config, projectName, jobName, loggerMetadata, callback) {
     execJobStep(
         config.jobs[jobName],
         config.jobs[jobName].length,
-        data => console.log(`[${projectName}:${jobName}] ${data}`),
+        data => processorLogger.info(data.msg, { ...loggerMetadata, ...data.meta }),
         err => callback(err)
     )
 }
@@ -27,14 +30,16 @@ const execJobStep = function(steps, stepsTotal, msg, callback) {
         return callback(err)
     })
 
-    process.stdout.on('data', data => msg(`[${currentStep}/${stepsTotal}] ${data}`))
-    process.stderr.on('data', data => msg(`[${currentStep}/${stepsTotal}] ${data}`))
+    const loggerMetadata =  { meta: { jobCurrentStep: currentStep, jobTotalsSteps: stepsTotal } }
+
+    process.stdout.on('data', data => msg({ ...loggerMetadata, msg: data}))
+    process.stderr.on('data', data => msg({ ...loggerMetadata, msg: data}))
 
     process.on('exit', code => {
-        msg(`[${currentStep}/${stepsTotal}] exit ${code}`)
+        msg({ ...loggerMetadata, msg: `step exit code: ${code}`})
 
         if(code !== 0) {
-            return callback(new Error(`exit code ${code}`))
+            return callback(new Error(`step exit code: ${code}`))
         } else {
             return execJobStep(stepsDeepCopy, stepsTotal, msg, callback)
         }
@@ -61,18 +66,18 @@ const getConfig = async function(projectName, callback) {
 
 const isConfigValid = function(config) {
     if(config === undefined) {
-        console.log('config is undefined')
+        processorLogger.info('config is undefined')
         return false
     }
 
     if(config.jobs === undefined) {
-        console.log('config.jobs is undefined')
+        processorLogger.info('config.jobs is undefined')
         return false
     }
 
     Object.keys(config.jobs).forEach(key => {
         if(!Array.isArray(config.jobs[key])) {
-            console.log(`config.jobs.${key} is not an array`)
+            processorLogger.info(`config.jobs.${key} is not an array`)
             return false
         }
     })

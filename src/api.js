@@ -1,18 +1,31 @@
 const express = require('express')
 const queue = require('fastq')
+const uuid = require('uuid').v4
+const winston = require('winston')
 
+const logger = require('./logger')
 const processor = require('./processor')
 
 const api = express.Router()
-const jobQueue = queue((args, done) => processor.exec(args.config, args.projectName, args.jobName, err => done(err, undefined)), 1)
+const jobQueue = queue((args, done) => processor.exec(args.config, args.projectName, args.jobName, args.loggerMetadata, err => done(err, undefined)), 1)
 
 api.post('/exec/:project/:job', (req, res) => {
     const projectName = req.params.project
     const jobName = req.params.job
 
+    const correlationId = uuid()
+    const loggerMetadata = {
+        project: projectName,
+        job: jobName,
+        correlationId: correlationId
+    }
+    const requestLogger = logger.getServiceLogger('api', loggerMetadata)
+
+    requestLogger.info(`New job request for ${projectName}:${jobName}`)
+
     processor.getConfig(projectName, (err, config) => {
         if(err !== null) {
-            console.error(err)
+            requestLogger.error(err.message)
             return res.status(500).json({ error: 'Internal error occured' })
         }
 
@@ -31,14 +44,15 @@ api.post('/exec/:project/:job', (req, res) => {
         let workerArgs = {
             config: config,
             projectName: projectName,
-            jobName: jobName
+            jobName: jobName,
+            loggerMetadata: loggerMetadata
         }
 
         jobQueue.push(workerArgs, (err, result) => {
             if(err !== null) {
-                return console.error(`[${projectName}:${jobName}] error:\n${err.toString()}`)
+                return requestLogger.error(err.message);
             } else {
-                return console.log(`[${projectName}:${jobName}] done`)
+                return requestLogger.info('done')
             }
         })
 
