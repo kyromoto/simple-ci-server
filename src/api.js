@@ -4,7 +4,7 @@ const uuid = require('uuid').v4
 
 const logger = require('./logger')
 const jobExecutor = require('./jobExecutor')
-const config = require('./config')
+const configlib = require('./configlib')
 
 const jobQueueHandler = function (args, done) {
     jobExecutor.run(
@@ -32,7 +32,7 @@ api.post('/exec/:project/:job', (req, res) => {
 
     requestLogger.info(`New job request for ${projectName}:${jobName}`, loggerMetadata)
 
-    config.getAllConfigs((err, config) => {
+    configlib.getAllConfigs((err, config) => {
         if(err !== null) {
             requestLogger.error(err.message)
             return res.status(500).json({ error: 'Internal error occured' })
