@@ -1,18 +1,27 @@
 const express = require('express')
 const queue = require('fastq')
 const uuid = require('uuid').v4
-const winston = require('winston')
 
 const logger = require('./logger')
-const processor = require('./processor')
+const jobExecutor = require('./jobExecutor')
+const config = require('./config')
 
+const jobQueueHandler = function (args, done) {
+    jobExecutor.run(
+        args.config,
+        args.projectName,
+        args.jobName,
+        args.correlationId,
+        err => done(err, undefined)
+    )
+}
+
+const jobQueue = queue(jobQueueHandler, 1)
 const api = express.Router()
-const jobQueue = queue((args, done) => processor.exec(args.config, args.projectName, args.jobName, args.loggerMetadata, err => done(err, undefined)), 1)
 
 api.post('/exec/:project/:job', (req, res) => {
     const projectName = req.params.project
     const jobName = req.params.job
-
     const correlationId = uuid()
     const loggerMetadata = {
         project: projectName,
@@ -21,31 +30,38 @@ api.post('/exec/:project/:job', (req, res) => {
     }
     const requestLogger = logger.getServiceLogger('api', loggerMetadata)
 
-    requestLogger.info(`New job request for ${projectName}:${jobName}`)
+    requestLogger.info(`New job request for ${projectName}:${jobName}`, loggerMetadata)
 
-    processor.getConfig(projectName, (err, config) => {
+    config.getAllConfigs((err, config) => {
         if(err !== null) {
             requestLogger.error(err.message)
             return res.status(500).json({ error: 'Internal error occured' })
         }
 
-        if(config === undefined) {
-            return res.status(404).json({ error: 'Project not found' })
+        try {
+            config.validate(config)
+        } catch(validationError) {
+            requestLogger.error("config validation error: " + validationError.message)
+            return res.status(500).json({ error: 'Internal error occured' })
         }
 
-        if(!processor.isConfigValid(config)) {
-            return res.status(500).json({ error: 'Project config not valid' })
+        if(config.projects[projectName] === undefined) {
+            const ProjectNotFoundError = new Error('Project not found')
+            requestLogger.warn(ProjectNotFoundError.message)
+            return res.status(404).json({ error: ProjectNotFoundError.message })
         }
 
-        if(config.jobs[jobName] === undefined) {
-            return res.status(404).json({ error: 'Job not found' })
+        if(config.projects[projectName].jobs[jobName] === undefined) {
+            const JobNotFoundError = new Error('Job not found')
+            requestLogger.warn(JobNotFoundError.message)
+            return res.status(404).json({ error: JobNotFoundError.message })
         }
 
         let workerArgs = {
             config: config,
             projectName: projectName,
             jobName: jobName,
-            loggerMetadata: loggerMetadata
+            correlationId: correlationId
         }
 
         jobQueue.push(workerArgs, (err, result) => {
