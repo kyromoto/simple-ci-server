@@ -17,15 +17,19 @@ CONFIG_PATH=configs
 
 ### Project
 
-Use a seperate file for each project in your config folder. The filename reflects the projectname (case sensitive).
+Use a seperate yaml-file (.yml or .yaml) for each project in your config folder. All files including subfolders will be loaded for each request.
 
 ```
 ---
 # sample.yaml
-  jobs:
-    build:
-      - echo 'Hello World!'
-      - echo 'Build project'
+projects:
+    myproject:
+        jobs:
+            build:
+                - name: First Step
+                  exec: echo 'Hello World!'
+                - name: Second Step
+                  exec: Build project'
 ```
 
 ## Usage
@@ -33,5 +37,5 @@ Use a seperate file for each project in your config folder. The filename reflect
 ### Trigger Tasks
 
 ```
-curl -X POST http://localhost:3000/api/exec/sample/build
+curl -X POST http://localhost:3000/api/exec/myproject/build
 ```
